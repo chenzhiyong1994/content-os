@@ -33,6 +33,16 @@ test("public defaults do not carry maintainer-specific service or identity value
   }
 });
 
+test("project homepage defaults to English and links both language editions", () => {
+  const english = fs.readFileSync(path.join(projectRoot, "README.md"), "utf8");
+  const chinese = fs.readFileSync(path.join(projectRoot, "README.zh-CN.md"), "utf8");
+
+  assert.match(english, /\*\*English\*\* \| \[简体中文\]\(README\.zh-CN\.md\)/);
+  assert.match(english, /> Turn AI-assisted writing/);
+  assert.match(chinese, /\[English\]\(README\.md\) \| \*\*简体中文\*\*/);
+  assert.match(chinese, /> 把 AI 写作/);
+});
+
 test("private working material is not part of the public file set", () => {
   const files = publicFiles().map((file) => file.replaceAll("\\", "/"));
 
