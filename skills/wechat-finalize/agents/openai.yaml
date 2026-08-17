@@ -1,0 +1,4 @@
+interface:
+  display_name: "微信公众号最终稿"
+  short_description: "根据风格深化稿和用户反馈收束最终稿，并内嵌发布前校验"
+  default_prompt: "使用 $wechat-finalize 根据风格深化稿、研究材料和用户反馈生成微信公众号最终稿。"

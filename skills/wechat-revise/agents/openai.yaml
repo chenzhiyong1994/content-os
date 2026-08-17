@@ -1,0 +1,4 @@
+interface:
+  display_name: "微信公众号修改稿"
+  short_description: "直接修改公众号初稿并内嵌事实、来源、逻辑和表达检查"
+  default_prompt: "使用 $wechat-revise 根据研究材料、初稿和用户反馈生成微信公众号修改稿。"

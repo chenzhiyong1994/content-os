@@ -1,0 +1,24 @@
+# Local work products
+workspace/
+
+# Credentials and machine-local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Private writing and brand material
+docs/references/style-examples/*.md
+!docs/references/style-examples/README.md
+docs/references/source-watchlist.md
+assets/brand/reference.*
+!assets/brand/README.md
+
+# Temporary and OS files
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
