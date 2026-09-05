@@ -122,7 +122,7 @@ test("typeset appends the configured author and engagement footer", () => {
   }
 });
 
-test("reviewed-source sync recognizes a configured author footer", () => {
+test("style readback excludes a configured footer and preserves its text baseline", () => {
   const { fixtureDir, draftPath } = makeFixture();
   try {
     const typesetResult = JSON.parse(runCli([
@@ -132,7 +132,7 @@ test("reviewed-source sync recognizes a configured author footer", () => {
       draftPath,
     ], configuredAuthorEnv));
     const html = fs.readFileSync(typesetResult.preview_html_path, "utf8");
-    const logsDir = path.join(fixtureDir, "wechat-publish-prep", "logs");
+    const logsDir = path.join(fixtureDir, "wechat-publish-prep", "dry-run", "logs");
     fs.mkdirSync(logsDir, { recursive: true });
     fs.writeFileSync(
       path.join(logsDir, "wechat-draft-request.json"),
@@ -151,9 +151,12 @@ test("reviewed-source sync recognizes a configured author footer", () => {
     ], configuredAuthorEnv));
     const reviewedMarkdown = fs.readFileSync(syncResult.reviewed_source_markdown_path, "utf8");
 
-    assert.equal(syncResult.author_footer_detected, true);
-    assert.match(reviewedMarkdown, /作者：示例作者/);
-    assert.match(reviewedMarkdown, /赞、在看、转发/);
+    assert.match(reviewedMarkdown, /测试正文/);
+    assert.doesNotMatch(reviewedMarkdown, /作者：示例作者|赞、在看、转发|谢谢你读到最后|星标|评论区留言/);
+    assert.equal(fs.readFileSync(syncResult.reviewed_source_html_path, "utf8"), html);
+    assert.equal(syncResult.baseline_status, "simulation");
+    assert.equal(fs.readFileSync(syncResult.uploaded_style_baseline_path, "utf8"), reviewedMarkdown);
+    assert.equal(syncResult.style_feedback_source_path, null);
   } finally {
     fs.rmSync(fixtureDir, { recursive: true, force: true });
   }

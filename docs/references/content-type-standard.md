@@ -1,174 +1,37 @@
-# Content Type Standard
+# 内容类型标准
 
-## Purpose
+## 职责
 
-Define the two supported article types in the active content workflow so the pipeline can route the same topic through different drafting and style behaviors without changing the stable stage order.
+本文件定义内容类型的选择、路由元数据与评价方式。阶段顺序和执行引擎以 `docs/operations/workflow-rules.md` 为准。
 
-The two supported types are:
+两类文章共用 AI、科技、职场与职业发展的内容范围，并遵守同一事实来源、作者声音和阶段保存规则。
 
-- `深度文`
-- `实用文`
+## 路线元数据
 
-This document is the source of truth for type selection, routing, and evaluation.
+方向锁定前声明，并在各阶段产物中传递：
 
-## Shared premise
+- `内容类型`：`深度文` / `实用文`
+- `目标受众`：`上班族` / `普通人` / `管理者`
+- `文章目标`：`建立认知` / `立即上手` / `推动流程改造`
 
-Both types still belong to the project content scope:
+已有用户选择或上游元数据时直接继承，不重复确认，也不从正文猜类型。完整流程的研究稿保存元数据，后续正文文件可用 YAML frontmatter 传递；发布排版必须排除这些内部字段。
 
-- AI
-- technology
-- workplace and career
+## 两类文章
 
-Both types also share these baseline requirements:
+| 维度 | 深度文 | 实用文 |
+| --- | --- | --- |
+| 主要目标 | 帮读者看清处境与判断边界 | 帮读者完成一个明确任务 |
+| 适合选题 | 现实摩擦、情绪或结构张力 | 具体场景、低成本尝试、可见结果 |
+| 常见推进 | 可核验事实或处境 → 摩擦 → 判断 → 结构问题 → 回到个人 | 场景 → 卡点 → AI 能与不能做什么 → 最小动作 → 示例 → 回到核心动作 |
+| 风格空间 | 允许更宽的历史、人文连接与情绪余波，必须有材料支撑 | 保留作者气口，步骤、工具、条件与完成信号优先清楚 |
+| 交付判断 | 判断有依据，读者能说清这件事该怎么看 | 读者能一眼看出能做什么，并实际尝试 |
 
-- topic must be clear before drafting
-- research must be grounded in real sources
-- the final piece must sound human rather than synthetic
-- the article must match the declared audience and article goal
+这些推进方式是常见路径，不是强制提纲。没有可靠现场时从事实、原话或直接判断进入，不编造场景。实用文结尾不临时扩写宏大方法论。
 
-## Required route metadata
+## 节点使用
 
-Before the main pipeline starts, declare:
+选题、初稿、修改和风格深化按类型调整取材与力度。研究、最终稿、发布准备和正文配图都继承类型与目标；风格回读沿用文章类型，判断偏好的适用范围。
 
-- `内容类型`: `深度文` or `实用文`
-- `目标受众`: `上班族` / `普通人` / `管理者`
-- `文章目标`: `建立认知` / `立即上手` / `推动流程改造`
+事实、来源、逻辑和已知表达检查内嵌在编辑修改与最终稿；独立审稿只在用户明确要求时调用 `skills/simulated-critique/SKILL.md`。
 
-This route metadata must travel through the whole run. Downstream stages should not guess the type from the prose.
-
-## Type 1: 深度文
-
-### Primary goal
-
-Help the reader see a situation more clearly.
-
-### Best fit
-
-- topics with strong reality friction
-- topics with emotional or structural tension
-- topics where the main value is a clearer judgment rather than a quick action
-
-### Typical output effect
-
-The reader should feel:
-
-- "这件事我被你讲明白了"
-- "原来问题卡在这里"
-
-### Drafting spine
-
-```text
-场景
--> 摩擦 / 不适感
--> 判断
--> 上提结构问题
--> 压回个体
-```
-
-### Style rule
-
-- preserve the existing Kabey-style strengths
-- allow stronger scene-setting, emotion, metaphor, and aftertaste
-- do not turn the piece into empty commentary
-
-## Type 2: 实用文
-
-### Primary goal
-
-Help the reader try something immediately.
-
-### Best fit
-
-- low-cost AI onboarding
-- common workplace use cases
-- topics that can be explained clearly and tried quickly
-- practical methods with visible results in a short time
-
-### Typical output effect
-
-The reader should feel:
-
-- "这个我现在就能试"
-- "原来普通人可以先这样接住 AI"
-
-### Drafting spine
-
-```text
-场景
--> 卡点
--> AI 能帮什么 / 不能帮什么
--> 最小可执行动作
--> 低成本示例
--> 提炼与余味
-```
-
-### Style rule
-
-- clarity and executability come first
-- keep the author's voice, but do not let it hide the action path
-- emotion, metaphor, and literary expression should mostly appear in the ending or small transition moments
-
-### Hard rule
-
-After style rewrite, the reader must still be able to tell at a glance what the article helps them do.
-
-## Topic routing rule
-
-### 深度文 topic filter
-
-Prefer topics that:
-
-- contain real-life discomfort, mismatch, or tension
-- support a scene-to-judgment progression
-- do not rely on a tool demo to be meaningful
-
-### 实用文 topic filter
-
-Prefer topics that:
-
-- map to a concrete reader task
-- have a low-cost or free trial path
-- can be tried within a short time window
-- produce a clear output or behavior change
-
-## Node routing rule
-
-### Must branch by content type
-
-- topic selection
-- first draft
-- revision
-- style rewrite
-
-### Stay shared but must read type metadata
-
-- research
-- critique round one
-- critique round two
-- finalization
-- 微信公众号发布准备
-- 公众号正文配图
-- 小红书适配
-- 本地阶段产物保存
-
-## Review rule
-
-### 深度文 review questions
-
-- did the judgment grow out of the scene
-- is there real friction instead of abstract opinion
-- does the ending land with weight
-
-### 实用文 review questions
-
-- is the use case clear
-- can the reader actually try it after reading
-- did the article drift back into loose commentary
-- did the style layer overpower the practical path
-
-## Boundary rule
-
-The workflow supports both types, but they must not be mixed by accident.
-
-If the user wants a deep article, do not flatten it into a checklist.
-If the user wants a practical article, do not let it drift into a reflective long essay.
+风格深化后再次检查：深度文是否仍有材料支持的判断；实用文是否保住工具、动作、成本、条件和完成信号。不要把深度文压成清单，也不要把实用文改成长篇杂谈。

@@ -11,6 +11,7 @@
 ## 本地验证
 
 ```powershell
+npm ci
 npm test
 git diff --check
 ```

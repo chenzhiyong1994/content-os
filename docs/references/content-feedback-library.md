@@ -11,7 +11,7 @@
 
 - Stage: 发生在哪个节点
 - Content type: 深度文 / 实用文
-- Platform: 公众号 / 小红书 / 跨平台
+- Platform: 公众号 / 通用写作
 - User feedback: 用户实际指出了什么
 - Before: 修改前的最小必要片段
 - After: 修改后的最小必要片段

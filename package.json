@@ -8,7 +8,10 @@
     "test": "node --test tests/*.test.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "parse5": "8.0.0"
+  }
 }

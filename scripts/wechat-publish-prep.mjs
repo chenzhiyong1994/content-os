@@ -1,12 +1,9 @@
 import fs from "node:fs/promises";
-import { execFile } from "node:child_process";
+import { extractWechatStyleText } from "./wechat-reviewed-source.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
 const WECHAT_COVER_RATIO = 2.35;
-
 function parseArgs(argv) {
   const parsed = {};
   for (let i = 0; i < argv.length; i += 1) {
@@ -49,6 +46,12 @@ function normalizeWechatAuthor(author) {
 
 function normalizeNewlines(text) {
   return text.replace(/\r\n/g, "\n");
+}
+
+function stripFrontmatter(markdown) {
+  return normalizeNewlines(markdown).replace(/^\uFEFF/, "")
+    .replace(/^---\n([\s\S]*?)\n---(?:\n|$)/, (block, fields) =>
+      /^(?:内容类型|目标受众|文章目标)\s*:/m.test(fields) ? "" : block);
 }
 
 function escapeHtml(text) {
@@ -95,6 +98,9 @@ function parseAspectRatio(value) {
 }
 
 function assertCoverSpecification(width, height, expectedSize, expectedRatio) {
+  if (expectedSize.width !== 3760 || expectedSize.height !== 1600) {
+    throw new Error("WeChat cover output is fixed at 3760x1600; size overrides must match this specification.");
+  }
   if (Math.abs(expectedRatio - WECHAT_COVER_RATIO) > 0.001) {
     throw new Error(`WeChat cover aspect ratio is fixed at 2.35:1; received ${expectedRatio.toFixed(4)}:1.`);
   }
@@ -154,6 +160,7 @@ function getDraftboxTypesetArtifacts(markdown, articleTitleOverride, author = ""
   const footerInjectedMarkdown = appendAuthorFooter(titledMarkdown, author);
   const normalizedMarkdown = normalizeLegacyWechatMarkdown(footerInjectedMarkdown);
   const structuredMarkdown = normalizeArticleStructureForWechat(normalizedMarkdown, articleTitle);
+  const autoSectionHeadings = []; // Public defaults do not invent section headings.
   const optimizedInternalMarkdown = optimizeMarkdownForWechat(structuredMarkdown);
   const optimizedMarkdown = denormalizeWechatMarkdown(optimizedInternalMarkdown);
   const html = convertMarkdownToWechatHtml(optimizedInternalMarkdown, articleTitle);
@@ -162,6 +169,7 @@ function getDraftboxTypesetArtifacts(markdown, articleTitleOverride, author = ""
     optimizedInternalMarkdown,
     optimizedMarkdown,
     html,
+    autoSectionHeadings,
   };
 }
 
@@ -932,129 +940,6 @@ function getDigest(plainText) {
   return `${digest.trim()}…`;
 }
 
-function decodeHtmlEntities(text) {
-  return text
-    .replace(/&#(\d+);/g, (_, value) => String.fromCodePoint(Number(value)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, value) => String.fromCodePoint(Number.parseInt(value, 16)))
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&quot;/gi, "\"")
-    .replace(/&#39;/gi, "'")
-    .replace(/&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&amp;/gi, "&");
-}
-
-function stripRedTextMarkers(text) {
-  return text.replace(/<text color="red">/g, "").replace(/<\/text>/g, "");
-}
-
-function convertInlineHtmlToMarkdown(fragment) {
-  let working = normalizeNewlines(fragment)
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<strong\b[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**")
-    .replace(/<b\b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**")
-    .replace(/<em\b[^>]*>([\s\S]*?)<\/em>/gi, "*$1*")
-    .replace(/<i\b[^>]*>([\s\S]*?)<\/i>/gi, "*$1*");
-
-  working = working.replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (_, attrs, inner) => {
-    const text = convertInlineHtmlToMarkdown(inner);
-    if (/color\s*:\s*(?:#c63b32|red)/i.test(attrs)) {
-      return `<text color="red">${text}</text>`;
-    }
-    return text;
-  });
-
-  working = working
-    .replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, "$1")
-    .replace(/<[^>]+>/g, "");
-
-  return decodeHtmlEntities(working)
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function convertParagraphHtmlToMarkdown(paragraphHtml) {
-  const match = paragraphHtml.match(/^<p\b([^>]*)>([\s\S]*?)<\/p>$/i);
-  if (!match) return "";
-  const attrs = match[1] || "";
-  const inner = match[2] || "";
-  const text = convertInlineHtmlToMarkdown(inner);
-  if (!text) return "";
-  const compactText = stripRedTextMarkers(text).replace(/[*_\s]/g, "");
-  if (/^[—–\-·•]+$/.test(compactText)) {
-    return "";
-  }
-
-  if (/text-align\s*:\s*center/i.test(attrs)) {
-    return `## ${stripRedTextMarkers(text).replace(/[*_]+/g, "").trim()}`;
-  }
-
-  if (/font-size\s*:\s*0/i.test(attrs) && /border-top\s*:/i.test(attrs)) {
-    return "";
-  }
-
-  if (/background\s*:\s*#f7f3f1/i.test(attrs) && /border-left\s*:\s*4px/i.test(attrs)) {
-    return `<quote-container>\n\n${text}\n</quote-container>`;
-  }
-
-  if (/color\s*:\s*#c63b32/i.test(attrs) && /font-weight\s*:\s*700/i.test(attrs)) {
-    return `<text color="red">**${stripRedTextMarkers(text)}**</text>`;
-  }
-
-  return text;
-}
-
-function convertBlockquoteHtmlToMarkdown(blockquoteHtml) {
-  const paragraphs = [];
-  for (const match of blockquoteHtml.matchAll(/<p\b[^>]*>[\s\S]*?<\/p>/gi)) {
-    const paragraph = convertParagraphHtmlToMarkdown(match[0]);
-    if (paragraph) {
-      paragraphs.push(paragraph);
-    }
-  }
-
-  if (paragraphs.length === 0) {
-    const fallback = convertInlineHtmlToMarkdown(blockquoteHtml);
-    if (!fallback) return "";
-    paragraphs.push(fallback);
-  }
-
-  return `<quote-container>\n\n${paragraphs.join("\n\n")}\n</quote-container>`;
-}
-
-function convertWechatDraftHtmlToMarkdown(html, articleTitle) {
-  const blocks = [];
-  let previousWasAuthorFooter = false;
-  for (const match of normalizeNewlines(html).matchAll(/<blockquote\b[^>]*>[\s\S]*?<\/blockquote>|<p\b[^>]*>[\s\S]*?<\/p>/gi)) {
-    const blockHtml = match[0];
-    const markdownBlock = /^<blockquote/i.test(blockHtml)
-      ? convertBlockquoteHtmlToMarkdown(blockHtml)
-      : convertParagraphHtmlToMarkdown(blockHtml);
-    if (!markdownBlock) {
-      continue;
-    }
-
-    const isAuthorFooter = isAuthorFooterContent(markdownBlock);
-    if (isAuthorFooter && previousWasAuthorFooter) {
-      continue;
-    }
-
-    blocks.push(markdownBlock);
-    previousWasAuthorFooter = isAuthorFooter;
-  }
-
-  const markdown = [`# ${articleTitle}`, ...blocks]
-    .filter(Boolean)
-    .join("\n\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  return `${markdown}\n`;
-}
-
 async function saveWorkflowContext(logsDir, patch) {
   const contextPath = path.join(logsDir, "workflow-context.json");
   const current = (await readJsonIfExists(contextPath)) || {};
@@ -1067,6 +952,7 @@ async function saveWorkflowContext(logsDir, patch) {
 }
 
 function getArticleTitle(markdown, overrideTitle) {
+  markdown = stripFrontmatter(markdown);
   if (overrideTitle) return getPlainTextFromMarkdown(String(overrideTitle));
   const heading = markdown.match(/^#\s+(.+?)\s*$/m);
   if (heading) return getPlainTextFromMarkdown(heading[1]);
@@ -1078,16 +964,12 @@ function getArticleTitle(markdown, overrideTitle) {
 }
 
 function getPublishMarkdown(markdown, articleTitle) {
-  const normalized = normalizeNewlines(markdown);
+  const normalized = stripFrontmatter(markdown);
   const bodyMatch = normalized.match(/^##\s+正文\s*\n([\s\S]*)$/m);
   if (!bodyMatch) {
     return normalized;
   }
   return `# ${articleTitle}\n\n${bodyMatch[1].trim()}\n`;
-}
-
-function dataUrlForBuffer(buffer, filePath) {
-  return `data:${mimeTypeFor(filePath)};base64,${buffer.toString("base64")}`;
 }
 
 function truncateCoverKeyPhrase(value, maxLength = 36) {
@@ -1133,105 +1015,6 @@ function getCoverPrompt(articleTitle, coverKeyPhrases) {
     "文字要求：默认尽量少放文字；只在帮助理解时加入 1 个中心短语，或最多 1-2 个极短中文标签；不搬运大段正文，不做标题海报，不堆密集小字。",
     "禁止项：不要水印、不要 logo、不要真实照片感、不要 3D render、不要企业海报、不要 UI 截图、不要元素堆满画面、不要托腮姿势、不要复刻参考图的静态摆拍。",
   ].join("\n");
-}
-
-function isBase64Like(value) {
-  return typeof value === "string" && value.length >= 128 && /^[A-Za-z0-9+/=\r\n]+$/.test(value);
-}
-
-function getImageCandidates(inputObject) {
-  const results = [];
-
-  function walk(node, hint = "") {
-    if (node == null) return;
-
-    if (typeof node === "string") {
-      if (node.startsWith("data:image/")) {
-        results.push({ kind: "data-url", value: node, hint });
-        return;
-      }
-
-      const dataMatches = [...node.matchAll(/data:image\/[^)\s]+/g)];
-      if (dataMatches.length > 0) {
-        for (const match of dataMatches) {
-          results.push({ kind: "data-url", value: match[0], hint });
-        }
-        return;
-      }
-
-      if (/^https?:\/\//.test(node)) {
-        results.push({ kind: "url", value: node, hint });
-        return;
-      }
-
-      if (/(b64|base64|image)/i.test(hint) && isBase64Like(node)) {
-        results.push({ kind: "base64", value: node.replace(/\s+/g, ""), hint });
-      }
-      return;
-    }
-
-    if (Array.isArray(node)) {
-      for (const child of node) walk(child, hint);
-      return;
-    }
-
-    if (typeof node === "object") {
-      for (const [key, value] of Object.entries(node)) {
-        if (key === "image_url" && value) {
-          if (typeof value === "string") {
-            walk(value, "image_url");
-            continue;
-          }
-          if (typeof value === "object" && value.url) {
-            walk(value.url, "image_url");
-            continue;
-          }
-        }
-        walk(value, key);
-      }
-    }
-  }
-
-  walk(inputObject);
-  return results;
-}
-
-async function saveImageCandidate(candidate, basePath) {
-  if (candidate.kind === "data-url") {
-    const match = candidate.value.match(/^data:(image\/[^;]+);base64,(.+)$/);
-    if (!match) {
-      throw new Error("Unsupported data URL image payload.");
-    }
-    const [, mime, payload] = match;
-    const ext =
-      mime === "image/jpeg" ? ".jpg" :
-      mime === "image/webp" ? ".webp" :
-      mime === "image/gif" ? ".gif" : ".png";
-    const outputPath = `${basePath}${ext}`;
-    await fs.writeFile(outputPath, Buffer.from(payload, "base64"));
-    return outputPath;
-  }
-
-  if (candidate.kind === "base64") {
-    const outputPath = `${basePath}.png`;
-    await fs.writeFile(outputPath, Buffer.from(candidate.value, "base64"));
-    return outputPath;
-  }
-
-  if (candidate.kind === "url") {
-    const response = await fetch(candidate.value);
-    const arrayBuffer = await response.arrayBuffer();
-    const mime = response.headers.get("content-type") || "image/png";
-    const ext =
-      /image\/jpeg/.test(mime) ? ".jpg" :
-      /image\/webp/.test(mime) ? ".webp" :
-      /image\/gif/.test(mime) ? ".gif" : ".png";
-    const outputPath = `${basePath}${ext}`;
-    await fs.writeFile(outputPath, Buffer.from(arrayBuffer));
-    return outputPath;
-  }
-
-  throw new Error(`Unsupported image candidate kind: ${candidate.kind}`);
 }
 
 async function getWechatAccessToken(appId, appSecret) {
@@ -1395,8 +1178,9 @@ async function main() {
   const coverKeyPhrases = getCoverKeyPhrases(plainText, articleTitle, coverKeyPhrasesArg);
   const coverPrompt = getCoverPrompt(articleTitle, coverKeyPhrases);
   const digest = getDigest(plainText);
-  const outputRoot = await ensureDir(path.join(path.dirname(finalDraftPath), "wechat-publish-prep"));
-  const tempRoot = await ensureDir(path.join(repoRoot, "workspace", "tmp", "wechat-publish-prep"));
+  const articleOutputRoot = path.join(path.dirname(finalDraftPath), "wechat-publish-prep");
+  const outputRoot = await ensureDir(dryRun ? path.join(articleOutputRoot, "dry-run") : articleOutputRoot);
+  const tempRoot = await ensureDir(path.join(outputRoot, "preview"));
   const assetsDir = await ensureDir(path.join(outputRoot, "assets"));
   const logsDir = await ensureDir(path.join(outputRoot, "logs"));
   const reviewedSourceDir = await ensureDir(path.join(outputRoot, "reviewed-source"));
@@ -1412,14 +1196,15 @@ async function main() {
     skill: "imagegen",
     imagegen_path: "runtime-configured-imagegen",
     endpoint: null,
-    model: "configured by the active imagegen runtime",
+    model: null,
+    provider: "active global imagegen runtime",
     reference_image_path: referenceReady ? referenceImagePath : null,
     target_output_path: path.join(assetsDir, "wechat-cover.png"),
     prompt: coverPrompt,
     cover_key_phrases: coverKeyPhrases,
     aspect_ratio: coverAspectRatio,
     image_size: coverImageSize,
-    note: "Generate the cover with the global imagegen skill, then run upload-draft with -CoverImagePath <generated file>.",
+    note: "Use the active global imagegen skill. Report model and endpoint only when exposed by the runtime. Save and verify a 3760x1600 PNG, then run upload-draft with -CoverImagePath <verified file>.",
   };
 
   if (action === "confirm-summary") {
@@ -1433,9 +1218,9 @@ async function main() {
       will_upload_draft: true,
       will_require_reviewed_source_sync_after_manual_edit: true,
       author_footer_enabled: Boolean(author),
-      imagegen_path: "runtime-configured-imagegen",
-      imagegen_endpoint: null,
-      selected_image_model: "configured by the active imagegen runtime",
+      imagegen_path: imagegenInstructions.imagegen_path,
+      imagegen_endpoint: imagegenInstructions.endpoint,
+      selected_image_model: imagegenInstructions.model,
       available_image_path: "global imagegen skill provided by the active runtime",
       image_size: coverImageSize,
       image_api_url: null,
@@ -1449,7 +1234,7 @@ async function main() {
       wechat_credentials_ready: Boolean(wechatAppId && wechatAppSecret),
       image_generation_confirmation_required: true,
       requires_confirmation: true,
-      next_required_action_after_manual_review: "sync-reviewed-source",
+      style_feedback_action_after_manual_review: "sync-reviewed-source",
     }, null, 2));
     return;
   }
@@ -1463,6 +1248,8 @@ async function main() {
       digest,
       preview_markdown_path: optimizedMarkdownPath,
       preview_html_path: htmlOutputPath,
+      auto_section_headings: artifacts.autoSectionHeadings,
+      source_image_base_dir: path.dirname(finalDraftPath),
       author_footer_included: hasAuthorFooter(artifacts.optimizedMarkdown),
       preview_only: true,
     });
@@ -1492,10 +1279,14 @@ async function main() {
     let coverImagePath = coverImagePathArg ? path.resolve(coverImagePathArg) : null;
 
     if (!coverImagePath) {
-      const assetEntries = await fs.readdir(assetsDir);
+      const coverAssetsDir = path.join(articleOutputRoot, "assets");
+      const assetEntries = await fs.readdir(coverAssetsDir).catch((error) => {
+        if (error.code === "ENOENT") return [];
+        throw error;
+      });
       const found = assetEntries.find((entry) => /^wechat-cover\./.test(entry));
       if (found) {
-        coverImagePath = path.join(assetsDir, found);
+        coverImagePath = path.join(coverAssetsDir, found);
       }
     }
 
@@ -1513,6 +1304,13 @@ async function main() {
 
     const generatedArtifacts = htmlPath ? null : getDraftboxTypesetArtifacts(markdown, articleTitleOverride, author);
     const html = htmlPath ? await fs.readFile(htmlPath, "utf8") : generatedArtifacts.html;
+    const localTypesetMetadata = await readJsonIfExists(path.join(logsDir, "typeset-metadata.json"));
+    const liveTypesetMetadata = dryRun
+      ? await readJsonIfExists(path.join(articleOutputRoot, "logs", "typeset-metadata.json")) : null;
+    const typesetMetadata = [localTypesetMetadata, liveTypesetMetadata]
+      .find((metadata) => metadata?.preview_html_path === htmlPath);
+    const autoSectionHeadings = generatedArtifacts?.autoSectionHeadings
+      || (typesetMetadata?.preview_html_path === htmlPath ? typesetMetadata.auto_section_headings : []) || [];
 
     const draftRequestPath = path.join(logsDir, "wechat-draft-request.json");
     const draftResponsePath = path.join(logsDir, "wechat-draft-response.json");
@@ -1522,7 +1320,7 @@ async function main() {
     const accessToken = dryRun ? "dry-run-token" : await getWechatAccessToken(wechatAppId, wechatAppSecret);
     const inlineResult = await replaceLocalImagesWithWechatUrls({
       html,
-      baseDir: htmlPath ? path.dirname(htmlPath) : path.dirname(finalDraftPath),
+      baseDir: htmlPath ? (typesetMetadata?.source_image_base_dir || path.dirname(htmlPath)) : path.dirname(finalDraftPath),
       accessToken,
       inlineLogPath,
       dryRun,
@@ -1547,6 +1345,7 @@ async function main() {
     if (dryRun) {
       await saveJson(draftRequestPath, draftBody);
       const savedContext = await saveWorkflowContext(logsDir, {
+        auto_section_headings: autoSectionHeadings,
         article_title: articleTitle,
         final_draft_path: finalDraftPath,
         output_root: outputRoot,
@@ -1596,6 +1395,7 @@ async function main() {
       final_draft_path: finalDraftPath,
       output_root: outputRoot,
       draft_media_id: draftResponse.media_id,
+      auto_section_headings: autoSectionHeadings,
       draft_request_path: draftRequestPath,
       draft_response_path: draftResponsePath,
     });
@@ -1665,7 +1465,22 @@ async function main() {
 
     const reviewedTitle = articlePayload.title || articleTitle;
     const reviewedHtml = articlePayload.content;
-    const reviewedMarkdown = convertWechatDraftHtmlToMarkdown(reviewedHtml, reviewedTitle);
+    const uploadedArticle = draftRequestLog?.articles?.[0];
+    const uploadMatchesDraft = draftResponseLog.media_id === draftMediaId;
+    const baselineStatus = dryRun ? "simulation"
+      : !uploadedArticle?.content || !draftResponseLog.media_id ? "missing"
+      : uploadMatchesDraft ? "available" : "draft-mismatch";
+    const styleOptions = {
+      autoHeadings: dryRun || uploadMatchesDraft ? workflowContext.auto_section_headings || [] : [],
+      fixedFooterText: buildAuthorFooterMarkdown(uploadedArticle?.author || articlePayload.author || author).replace(/<\/?quote-container>/g, "").trim(),
+    };
+    const reviewedMarkdown = extractWechatStyleText(reviewedHtml, reviewedTitle, styleOptions);
+    let uploadedStyleBaselinePath = null;
+    if (baselineStatus === "available" || baselineStatus === "simulation") {
+      uploadedStyleBaselinePath = path.join(reviewedSourceDir, "uploaded-style-baseline.md");
+      await saveUtf8(uploadedStyleBaselinePath,
+        extractWechatStyleText(uploadedArticle.content, uploadedArticle.title || articleTitle, styleOptions));
+    }
 
     await saveUtf8(reviewedSourceHtmlPath, reviewedHtml);
     await saveUtf8(reviewedSourceMarkdownPath, reviewedMarkdown);
@@ -1678,6 +1493,8 @@ async function main() {
       reviewed_source_html_path: reviewedSourceHtmlPath,
       reviewed_source_markdown_path: reviewedSourceMarkdownPath,
       reviewed_source_sync_log_path: syncLogPath,
+      uploaded_style_baseline_path: uploadedStyleBaselinePath,
+      style_feedback_baseline_status: baselineStatus,
     });
 
     const syncResult = {
@@ -1686,9 +1503,12 @@ async function main() {
       draft_media_id: draftMediaId,
       reviewed_source_html_path: reviewedSourceHtmlPath,
       reviewed_source_markdown_path: reviewedSourceMarkdownPath,
-      author_footer_detected: hasAuthorFooter(reviewedMarkdown),
+      purpose: "style-feedback-only",
+      baseline_status: baselineStatus,
+      uploaded_style_baseline_path: uploadedStyleBaselinePath,
+      style_feedback_source_path: dryRun ? null : reviewedSourceMarkdownPath,
+      style_feedback_baseline_path: baselineStatus === "available" ? uploadedStyleBaselinePath : null,
       workflow_context_path: savedContext.contextPath,
-      downstream_source_for_xiaohongshu: reviewedSourceMarkdownPath,
     };
     await saveJson(syncLogPath, syncResult);
 

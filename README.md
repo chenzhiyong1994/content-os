@@ -7,10 +7,10 @@
 > Turn AI-assisted writing from a one-off generation into a local-first, reviewable, and reusable content production pipeline.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f855a.svg)](LICENSE)
-![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-43853d)
+![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.18-43853d)
 ![Local First](https://img.shields.io/badge/local--first-by%20default-2563eb)
 
-Content OS is an agent-driven workflow for Chinese-language content creators. It connects topic discovery, research, long-form WeChat writing, human calibration, Xiaohongshu adaptation, and image preparation through explicit stages, artifacts, and review gates.
+Content OS is an agent-driven workflow for Chinese-language content creators. It connects topic discovery, research, long-form WeChat writing, human calibration, and optional WeChat article illustrations through explicit stages, artifacts, and review gates.
 
 It is not a black box that takes a topic and publishes automatically. Every important stage leaves a local artifact. Research, voice, and external actions are handled separately, and publishing or paid generation always remains an explicit decision.
 
@@ -20,22 +20,32 @@ Many AI writing failures are workflow failures rather than model failures: trend
 
 Content OS turns those problems into executable constraints:
 
-- **Traceable stage artifacts:** every step, from `00_选题卡.md` to `06_小红书版.md`, has a stable input and output.
+- **Traceable stage artifacts:** every step, from `00_选题卡.md` to `05_最终稿.md` and WeChat draft preparation, has a stable input and output.
 - **Research stays separate from expression:** aggregated summaries are signals, not evidence; important claims return to primary sources.
 - **Author voice can compound:** representative writing, a style profile, and human feedback calibrate the workflow over time.
-- **Platform adaptation is not compression:** WeChat and Xiaohongshu reorganize material for their own reading contexts instead of mechanically slicing one article.
+- **Human edits improve voice:** readback compares uploaded and edited text for wording, punctuation, and sentence or paragraph rhythm; visual formatting stays outside the style profile.
 - **External actions have gates:** draft uploads, remote updates, and paid image generation require explicit confirmation.
 - **Sensitive data stays local by default:** working files, credentials, brand references, and private writing samples do not enter Git.
 
 ## Workflow
 
-![Content OS workflow: from topic signals and research to writing, human calibration, and platform adaptation](assets/readme/workflow.png)
+```mermaid
+flowchart TD
+  A["Topic discovery — optional"] --> B["Research"]
+  B --> C["Draft → Revise → Style refinement → Final draft"]
+  C --> D["WeChat draft box and human review"]
+  D --> E["Article illustrations — optional"]
+  D -. "after manual edits" .-> F["Text-only readback against uploaded baseline"]
+  F --> G["Author style profile"]
+```
 
-You do not need to run every optional stage. Trend collection, in-article illustrations, and image generation are explicit choices, while the core writing stages advance through Review Gates instead of running unattended from start to finish.
+Xiaohongshu adaptation and image production are retired; their instructions are retained in `docs/archive/` and excluded from active routing. Xiaohongshu remains a topic-discovery source. Readback is a style-feedback branch, independent of publishing and illustration.
+
+You do not need to run every optional stage. Trend collection and in-article illustrations are explicit choices, while the core writing stages advance through Review Gates instead of running unattended from start to finish.
 
 ## Who It Is For
 
-- WeChat, Xiaohongshu, and knowledge-content creators who want AI assistance without flattening their voice.
+- WeChat and knowledge-content creators who want AI assistance without flattening their voice.
 - Small teams that want stable collaboration points across discovery, research, writing, editing, and publishing.
 - Codex and coding-agent users who prefer workflows and artifacts to remain visible inside the repository.
 - Creators who care about sources, rollback, and accountable human judgment.
@@ -47,10 +57,11 @@ You do not need to run every optional stage. Trend collection, in-article illust
 ```powershell
 git clone https://github.com/chenzhiyong1994/content-os.git
 Set-Location content-os
+npm ci
 npm test
 ```
 
-The repository has no runtime npm dependencies. Tests use the Node.js built-in test runner. Node.js 20+ and PowerShell 7+ are recommended.
+Node.js 22.18+ and PowerShell 7+ are required. `npm ci` installs the locked HTML parser used for text readback; tests use the Node.js built-in test runner. Dry runs and previews are isolated per article.
 
 ### 2. Add your own style material
 
@@ -78,7 +89,7 @@ The Agent reads `AGENTS.md`, the workflow rules, and the relevant skill before s
 | --- | --- | --- |
 | External writing engine (optional) | Delegate heavy writing stages to another CLI | Configure the command and model explicitly; otherwise the current Agent writes |
 | Browser access | Validate discussions on signed-in social platforms | Run source health checks first; public search cannot impersonate signed-in scanning |
-| ImageGen | Covers, article illustrations, and Xiaohongshu images | Show the model, dimensions, output path, and complete prompt before confirmation |
+| ImageGen | Covers and WeChat article illustrations | Show the tool path, visible model information, dimensions, output path, and complete prompt before confirmation |
 | WeChat Official Account API | Upload and read back drafts | Supply credentials only through environment variables; dry run is supported |
 
 See `.env.example` and `docs/operations/wechat-publish-setup.md` for environment variables. Credentials are never written to logs or the repository.
@@ -90,6 +101,7 @@ See `.env.example` and `docs/operations/wechat-publish-setup.md` for environment
 ├─ AGENTS.md                         # Project constitution and task routing
 ├─ docs/
 │  ├─ operations/                    # Workflow, feedback, publishing, and version safety
+│  ├─ archive/                       # Retired instructions, excluded from active routing
 │  └─ references/                    # Content type, facts, style, and platform standards
 ├─ skills/                           # Executable instructions for each content stage
 ├─ scripts/                          # Local helper scripts

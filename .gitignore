@@ -22,3 +22,6 @@ assets/brand/reference.*
 *.log
 .DS_Store
 Thumbs.db
+
+# Installed dependencies
+node_modules/

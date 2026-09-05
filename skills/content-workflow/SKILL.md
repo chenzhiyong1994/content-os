@@ -1,6 +1,6 @@
 ---
 name: content-workflow
-description: 用于运行 content-os 的完整内容生产流程：选题、研究、带作者声音的初稿、编辑修改、必做风格深化、最终稿、公众号发布准备、小红书适配和图片生成。触发词：帮我做一篇，做一期内容，从头写一篇，写篇公众号，开始内容创作。
+description: 用于运行 content-os 的完整内容生产流程：选题、研究、带作者声音的初稿、编辑修改、必做风格深化、最终稿、公众号发布准备和可选正文配图。触发词：帮我做一篇，做一期内容，从头写一篇，写篇公众号，开始内容创作。
 ---
 
 # content-os 内容流程
@@ -33,16 +33,14 @@ description: 用于运行 content-os 的完整内容生产流程：选题、研�
 | 微信公众号修改稿 | `skills/wechat-revise/SKILL.md` |
 | 风格深化（每篇必做） | `skills/style-refine/SKILL.md` |
 | 微信公众号最终稿 | `skills/wechat-finalize/SKILL.md` |
-| 微信公众号发布准备和待发布源稿回读 | `skills/wechat-publish-prep/SKILL.md` |
+| 微信公众号发布准备 | `skills/wechat-publish-prep/SKILL.md` |
 | 公众号正文配图 | `skills/wechat-article-illustration/SKILL.md` |
-| 小红书适配 | `skills/xiaohongshu-adapt/SKILL.md` |
-| 小红书图片生成 | `skills/xiaohongshu-image-generation/SKILL.md` |
 
 ## 辅助路由
 
 | 场景 | 使用 |
 | --- | --- |
-| 用户审核反馈、草稿箱手动校准、风格或内容经验沉淀 | `skills/style-feedback/SKILL.md` |
+| 用户审核反馈；草稿箱手动修改后的风格学习 | `skills/style-feedback/SKILL.md` |
 | 用户明确要求单独审稿、挑毛病或只诊断不修改 | `skills/simulated-critique/SKILL.md` |
 
 ## 不适用
