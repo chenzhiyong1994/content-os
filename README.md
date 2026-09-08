@@ -4,6 +4,10 @@
 
 # Content OS
 
+**[Visit the project website →](https://chenzhiyong1994.github.io/content-os/)** · [中文主页](https://chenzhiyong1994.github.io/content-os/) · [Website maintenance](docs/operations/project-homepage.md)
+
+Explore the workflow, project principles, and quick start on the GitHub Pages website. The homepage source lives in `site/` and is deployed automatically from `main` using GitHub Actions.
+
 > Turn AI-assisted writing from a one-off generation into a local-first, reviewable, and reusable content production pipeline.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f855a.svg)](LICENSE)
@@ -106,6 +110,7 @@ See `.env.example` and `docs/operations/wechat-publish-setup.md` for environment
 ├─ skills/                           # Executable instructions for each content stage
 ├─ scripts/                          # Local helper scripts
 ├─ tests/                            # Publishing and browser contract tests
+├─ site/                             # Static project website, deployed to GitHub Pages
 ├─ assets/brand/                     # Your local brand reference material
 └─ workspace/                        # Temporary files and article outputs, ignored by default
 ```

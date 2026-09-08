@@ -4,6 +4,10 @@
 
 # Content OS
 
+**[访问项目主页 →](https://chenzhiyong1994.github.io/content-os/)** · [主页维护与发布](docs/operations/project-homepage.md)
+
+在主页查看项目理念、交互式内容工作流和快速开始指南。主页源码位于 `site/`，通过 GitHub Actions 自动发布到 GitHub Pages。
+
 > 把 AI 写作从“一次性生成”，变成一条本地优先、可审查、可复用的内容生产线。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f855a.svg)](LICENSE)
